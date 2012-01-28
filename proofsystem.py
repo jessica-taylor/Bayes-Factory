@@ -1,63 +1,14 @@
+
 from collections import defaultdict
 import math
 import numbers
-import random
 
 import graphsort
 
 from distribution import CallRef, DistrCall, Distribution, LiteralRef
 from model import DistrResult, Model
 
-
-
-def resolveValue(values, val):
-  if isinstance(val, CallRef):
-    return values[val.callIndex][val.valueIndex]
-  return val
-
-def resolveCall(values, call):
-  return DistrCall(call.function, tuple(resolveValue(values, v) for v in call.parameters))
-
-def distributionLiteralRefs(distr):
-  res = []
-  def process(value):
-    if isinstance(value, LiteralRef):
-      res.append(value)
-  for call in distr.calls:
-    for param in call.parameters:
-      process(param)
-  for result in distr.result:
-    process(result)
-  return res
-
-
-
-def sampleDistr(model, distribution):
-  assert isinstance(model, Model)
-  assert isinstance(distribution, Distribution)
-  values = []
-  for call in distribution.calls:
-    resolvedCall = resolveCall(values, call)
-    values.append(sample(model, resolvedCall))
-  return tuple(resolveValue(values, r) for r in distribution.result)
-
-
-def sample(model, call):
-  assert isinstance(model, Model)
-  assert isinstance(call, DistrCall)
-  if call.function == 'bernouli':
-    assert len(call.parameters) == 1
-    p = model.refToJSON(call.parameters[0])
-    assert isinstance(p, numbers.Real)
-    assert 0 <= p <= 1
-    model.modifyReferenceCount(call.parameters[0], -1)
-    res = random.random() < p
-    return [model.JSONToRef(res)]
-  distrResult = model.getDistribution(call)
-  res = sampleDistr(model, distrResult.distribution)
-  return res
-
-
+import algprob
 
 class ProofEnv(object):
 
@@ -105,7 +56,7 @@ class ProofEnv(object):
     return newVars
 
   def expandProofHelper(self, values, calls, rets, proof):
-    resolve = lambda x: resolveValue(values, x)
+    resolve = lambda x: algprob.resolveValue(values, x)
     if len(calls) == 0:
       assert isinstance(proof, ResultProof)
       assert len(proof.result) == len(rets)
@@ -116,7 +67,7 @@ class ProofEnv(object):
     else:
       assert isinstance(proof, LetProof)
       res = []
-      call = resolveCall(values, calls[0])
+      call = algprob.resolveCall(values, calls[0])
       self.unifyCalls(proof.call, call)
       for retTuple, restProof in proof.proofDict.items():
         expandRest = expandProofHelper(self, values + [retTuple], calls[1:], rets, restProof)

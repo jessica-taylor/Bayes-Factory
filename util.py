@@ -1,4 +1,6 @@
 
+import math
+
 def makeDataClass(cls):
   """
   Makes cls into a data class.
@@ -17,6 +19,14 @@ def makeDataClass(cls):
 
   cls.__cmp = clsCmp
   cls.__hash__ = clsHash
+
+def sumByLogs(xs):
+  """
+  Computes math.log(sum(map(math.exp, xs))) while minimizing rounding error.
+  """
+  maxLog = max(xs)
+  adjSum = sum(math.exp(x - maxLog) for x in xs)
+  return math.log(adjSum) + maxLog
 
 def agrestiCoullLower(z, x, n):
   n2 = n + z**2

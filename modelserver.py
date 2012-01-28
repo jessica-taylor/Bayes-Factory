@@ -6,6 +6,9 @@ from distribution import Distribution, DistrCall, LiteralRef
 from model import Model
 
 class SocketModelServer:
+  """
+  Serves a model through a socket, so a SocketModelClient can communicate with it.
+  """
 
   BUFSIZE = 1024
 
@@ -14,6 +17,9 @@ class SocketModelServer:
     self.socket = sock
 
   def run(self):
+    """
+    Runs the server.
+    """
     query = ""
     while True:
       received = self.socket.recv(SocketModelServer.BUFSIZE)
@@ -43,6 +49,10 @@ class SocketModelServer:
       return self.model.writeJSON(LiteralRef.fromJSON(jsonObj))
     if command == 'isEqual':
       return self.model.isEqual(jsonObj[0], jsonObj[1])
+
+  def doQuery(self, query):
+    res = self.getQueryResult(query)
+    self.socket.sendAll(json.dumps(res) + '\n')
 
 
 

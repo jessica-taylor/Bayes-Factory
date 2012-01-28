@@ -7,6 +7,9 @@ from model import DistributionResult, Model
 
 
 class SocketModelClient(Model):
+  """
+  A model that defers to an external model communicating over a socket to answer calls.
+  """
 
   BUFSIZE = 1024
 
@@ -14,6 +17,10 @@ class SocketModelClient(Model):
     self.socket = sock
 
   def rawQueryModel(self, queryString):
+    """
+    Sends a string to the external model, then returns the JSON that the model
+    replies with.
+    """
     self.socket.sendAll(queryString)
     data = ""
     while True:
@@ -25,7 +32,11 @@ class SocketModelClient(Model):
     return json.loads(data)
 
   def queryModel(self, command, args):
-    query = command + ' ' + json.dumps(args)
+    """
+    Sends a command and arguments (as a single JSON object) to the external model, then
+    returns the JSON that the external model replies with.
+    """
+    query = command + ' ' + json.dumps(args) + '\n'
     return self.rawQueryModel(query)
 
   def getDistribution(self, call):
@@ -40,8 +51,8 @@ class SocketModelClient(Model):
       }
     )
 
-  def readJSON(self, jsonObj):
-    res = self.queryModel('readJSON', jsonObj)
+  def JSONToRef(self, jsonObj):
+    res = self.queryModel('JSONToRef', jsonObj)
     return LiteralRef.fromJSON(res)
 
   def writeJSON(self, ref):
