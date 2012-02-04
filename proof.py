@@ -41,6 +41,9 @@ class ProbLabel(object):
   def getData(self):
     return (self.call, self.result)
 
+  def __str__(self):
+    return str(self.call) + " -> " + ' '.join(map(str, self.result))
+
   def toJSON(self):
     return {'call': self.call.toJSON(),
             'result': [r.toJSON() for r in self.result]}
@@ -48,64 +51,41 @@ class ProbLabel(object):
 makeDataClass(ProbLabel)
 
 
-
-
 class Proof(object):
-  """
+
+  def __init__(self, label, callLabelsList):
+    assert isinstance(label, ProbLabel)
+    callLabelsList = tuple(map(tuple, callLabelsList))
+    assert all(all(isinstance(x, ProbLabel) for x in xs)
+               for xs in callLabelsList)
+    if len(callLabelsList) > 0:
+      length = len(callLabelsList[0])
+      assert all(len(x) == length for x in callLabelsList)
+    self.label = label
+    self.callLabelsList = callLabelsList
+
+  def getData(self):
+    return (self.label, self.callLabelsList)
+
+  def __str__(self):
+    def callLabelsStr(callLabels):
+      return '{' + '; '.join(map(str, callLabels)) + '}'
+    return str(self.label) + " : " + ', '.join(map(callLabelsStr, self.callLabelsList))
+
+makeDataClass(Proof)
+
+
+"""
+class Proof(object):
   A proof proves a lower bound on the probability of a ProbLabel in terms of other
-  ProbLabels.  It is a recursive structure of LetProofs, eventually coming to a
-  ReturnProof.  The depth of nesting should be equal to the number of calls in the
-  ProbLabel's DistrCall's Distribution.
-  """
-  def __init__(self):
-    pass
-
-class ResultProof(Proof):
-  """
-  Should be at level (number of calls in the Distribution).  States the results of the
-  Distribution as a tuple.
-  """
-  def __init__(self, result):
-    result = tuple(result)
-    assert all(map(isProofValue, result))
-    self.result = result
+  ProbLabels.
+  def __init__(self, labels):
+    self.labels = tuple(labels)
+    assert all(isinstance(x, ProbLabel) for x in self.labels)
 
   def getData(self):
-    return self.result
+    return self.labels
 
-  def toJSON(self):
-    return {'type': 'result',
-            'result': [r.toJSON() for r in self.result]}
+makeDataClass(Proof)
+"""
 
-makeDataClass(ReturnProof)
-
-class LetProof(Proof):
-  """
-  Should be at intermediate levels.  States the current DistrCall and a dictionary
-  mapping possible return values of the DistrCall to proofs on the condition that the
-  DistrCall returns that value.
-  """
-  def __init__(self, call, proofDict):
-    assert isinstance(call, DistrCall)
-    self.call = call
-    self.proofDict = {}
-    for values,restProof in proofDict.values():
-      values = tuple(values)
-      assert all(map(isProofValue, values))
-      assert isinstance(restProof, Proof)
-      self.proofDict[values] = restProof
-
-  def getData(self):
-    return (self.call, self.proofDict)
-
-  def toJSON(self):
-    return {'type': 'let',
-            'call': call.toJSON(),
-            'proofDict': [
-              {'values': [v.toJSON() for v in values],
-               'restProof': restProof.toJSON()}
-              for values,restProof in self.proofDict.items()
-            ]}
-
-
-makeDataClass(LetProof)

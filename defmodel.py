@@ -72,7 +72,7 @@ class PythonFunctionModel(Model):
     assert isinstance(value, LiteralRef)
     assert value.ref in self.referenced
     res = self.referenced[value.ref][0]
-    self.modifyReferenceCount(value, -1)
+    #self.modifyReferenceCount(value, -1)
     return res
 
   def internObject(self, obj):
@@ -114,6 +114,7 @@ class PythonFunctionModel(Model):
       del self.referenced[ref]
     else:
       data[1] = newCount
+
 
 
 

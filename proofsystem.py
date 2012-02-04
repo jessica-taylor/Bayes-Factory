@@ -1,5 +1,6 @@
 
 from collections import defaultdict
+import json
 import math
 import numbers
 
@@ -7,25 +8,33 @@ import graphsort
 
 from distribution import CallRef, DistrCall, Distribution, LiteralRef
 from model import DistrResult, Model
+from proof import Variable, Proof
 
 import algprob
+import util
 
 class ProofEnv(object):
 
   def __init__(self, model, timePenaltyRate):
     self.model = model
     self.timePenaltyRate = timePenaltyRate
+    self.distributionCache = {}
     self.varValues = {}
     self.newVars = []
-    self.labelPolys = {}
+    self.labelPolys = defaultdict(lambda: [])
 
-  def resolveValue(value):
+  def getDistribution(self, call):
+    if call not in self.distributionCache:
+      self.distributionCache[call] = self.model.getDistribution(call)
+    return self.distributionCache[call]
+
+  def resolveValue(self, value):
     if isinstance(value, Variable):
       assert value.varid in self.varValues
       return self.varValues[value.varid]
     return value
 
-  def resolveCall(call):
+  def resolveCall(self, call):
     assert isinstance(call, DistrCall)
     return DistrCall(call.function, map(self.resolveValue, call.parameters))
 
@@ -36,7 +45,7 @@ class ProofEnv(object):
       if varid in self.varValues:
         varValue = self.varValues[varid]
         assert self.model.isEqual(varValue, retValue)
-        self.model.modifyReferenceCount(retValue, -1)
+        #self.model.modifyReferenceCount(retValue, -1)
       else:
         self.varValues[varid] = retValue
         self.newVars.append((proofValue, retValue))
@@ -55,57 +64,59 @@ class ProofEnv(object):
     self.newVars = []
     return newVars
 
-  def expandProofHelper(self, values, calls, rets, proof):
-    resolve = lambda x: algprob.resolveValue(values, x)
-    if len(calls) == 0:
-      assert isinstance(proof, ResultProof)
-      assert len(proof.result) == len(rets)
-      rets = [resolveValue(values, r) for r in rets]
-      for p,r in zip(proof.result, rets):
-        self.unify(p, r)
-      return [rets, []]
-    else:
-      assert isinstance(proof, LetProof)
-      res = []
-      call = algprob.resolveCall(values, calls[0])
-      self.unifyCalls(proof.call, call)
-      for retTuple, restProof in proof.proofDict.items():
-        expandRest = expandProofHelper(self, values + [retTuple], calls[1:], rets, restProof)
-        for retValues, factors in expandRest:
-          res.append((retValues, [ProbLabel(call, retTuple)] + factors))
-      return res
+  def verifyCallLabels(self, label, distr, callLabels):
+    values = []
+    assert len(callLabels) == len(distr.calls)
+    for call,callLabel in zip(distr.calls, callLabels):
+      call = algprob.resolveCall(values, call)
+      self.unifyCalls(callLabel.call, call)
+      values.append(callLabel.result)
+    assert len(distr.result) == len(label.result)
+    for distrRes,labelRes in zip(distr.result, label.result):
+      distrRes = algprob.resolveValue(values, distrRes)
+      self.unify(labelRes, distrRes)
+
+  def isCallLabelsListDisjoint(self, callLabelsList, startIndex=0):
+    if len(callLabelsList) <= 1:
+      return True
+    length = len(callLabelsList[0])
+    if startIndex >= length:
+      return False
+    jsonMapping = defaultdict(lambda: [])
+    for callLabels in callLabelsList:
+      def valueToJSON(value):
+        return self.model.refToJSON(self.resolveValue(value))
+      json = [valueToJSON(v) for v in callLabels[startIndex].result]
+      jsonStr = json.dumps(json)
+      jsonMapping[jsonStr].append(callLabels)
+    for callLabelsList in jsonMapping.values():
+      if not self.isCallLabelsDisjoint(callLabelsList, startIndex + 1):
+        return False
+    return True
 
 
-  def expandProof(self, call, proof):
-    call = self.resolveCall(call)
-    distrResult = self.model.getDistribution(call)
+  def expandProof(self, proof):
+    assert self.isCallLabelsListDisjoint(proof.callLabelsList)
+    label = proof.label
+    call = self.resolveCall(label.call)
+    distrResult = self.getDistribution(call)
     distr = distrResult.distribution
-    exp = expandProofHelper(self, [], distr.calls, distr.result, proof)
-    for vals,factors in exp:
-      label = ProbLabel(call, vals)
-      self.labelPolys[label].append(factors)
+    for callLabels in proof.callLabelsList:
+      self.verifyCallLabels(label, distr, callLabels)
+      self.labelPolys[label].append(callLabels)
+
 
   def expandProofSystem(self, proofSystem):
-    self.labelPolys = defaultdict(lambda: [])
-
-    varUses = defaultdict(lambda: 0)
-    for call in proofSystem:
-      for param in call.parameters:
-        if isinstance(param, Variable):
-          varUses[param] += 1
-
-    for call,proof in proofSystem.items():
-      self.expandProof(call, proof)
-      for var,ref in self.popNewVars():
-        self.model.modifyReferenceCount(ref, varUses[ref] - 1)
+    for proof in proofSystem:
+      self.expandProof(proof)
 
   def createNumericPolys(self):
     self.labels = list(self.labelPolys)
     self.invLabels = {}
-    for i,label in self.labels:
+    for i,label in enumerate(self.labels):
       self.invLabels[label] = i
     self.numLabelPolys = {}
-    for i,label in enumerate(labels):
+    for i,label in enumerate(self.labels):
       numTerms = []
       for factors in self.labelPolys[label]:
         logCoeff = 0
@@ -114,11 +125,11 @@ class ProofEnv(object):
           if factor.call.function == 'bernouli':
             (probVal,) = factor.call.parameters
             probRef = self.resolveValue(probVal)
-            prob = self.model.JSONToRef(probRef)
+            prob = self.model.refToJSON(probRef)
             assert 0 <= prob <= 1
             (resVal,) = factor.result
             resRef = self.resolveValue(resVal)
-            res = self.model.JSONToRef(resRef)
+            res = self.model.refToJSON(resRef)
             assert res in [True, False]
             if res:
               probCorrect = prob
@@ -136,7 +147,7 @@ class ProofEnv(object):
     graph = {}
     for i,terms in self.numLabelPolys.items():
       refs = set([])
-      for factors in terms:
+      for _,factors in terms:
         for factor in factors:
           refs.add(factor)
       graph[i] = list(refs)
@@ -148,7 +159,9 @@ class ProofEnv(object):
     def termProb(term):
       return term[0] + sum(self.logProbs[j] for j in term[1])
     oldLogProb = self.logProbs[i]
-    self.logProbs[i] = util.sumByLogs(map(termProb, self.numLabelPolys[i]))
+    self.logProbs[i] = util.sumByLogs(list(map(termProb, self.numLabelPolys[i])))
+    if self.logProbs[i] == util.negInfinity:
+      return 0.0
     return self.logProbs[i] - oldLogProb
 
 
@@ -161,6 +174,7 @@ class ProofEnv(object):
         break
 
   def solveSystem(self):
+    self.logProbs = defaultdict(lambda: util.negInfinity)
     for component in self.sortCalls():
       self.solveSCC(component)
 
@@ -176,27 +190,9 @@ class ProofEnv(object):
     return res
 
 
-
 def evaluateProof(model, proofSystem, timePenaltyRate):
-  sys = ProofSystem(model, timePenaltyRate)
-  sys.solveProofSystem(proofSystem)
-  return sys.getFinalResult()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+  env = ProofEnv(model, timePenaltyRate)
+  env.solveProofSystem(proofSystem)
+  return env.getFinalResult()
 
 

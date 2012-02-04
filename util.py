@@ -20,12 +20,18 @@ def makeDataClass(cls):
   cls.__cmp = clsCmp
   cls.__hash__ = clsHash
 
+negInfinity = float("-inf")
+
 def sumByLogs(xs):
   """
   Computes math.log(sum(map(math.exp, xs))) while minimizing rounding error.
   """
+  if len(xs) == 0:
+    return 1
   maxLog = max(xs)
   adjSum = sum(math.exp(x - maxLog) for x in xs)
+  if adjSum == 0:
+    return negInfinity
   return math.log(adjSum) + maxLog
 
 def agrestiCoullLower(z, x, n):

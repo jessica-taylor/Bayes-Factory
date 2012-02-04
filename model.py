@@ -1,3 +1,5 @@
+import json
+
 import distribution
 from distribution import LiteralRef, DistrCall, Distribution
 from util import makeDataClass
@@ -76,7 +78,7 @@ class Model(object):
     pointed to by bref.  Should be equivalent to:
     refToJSON(aref) == refToJSON(bref)
     """
-    raise Exception("not implemented")
+    return json.dumps(self.refToJSON(aref)) == json.dumps(self.refToJSON(bref))
 
 class WrappedModel(Model):
   """

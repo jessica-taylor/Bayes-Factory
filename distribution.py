@@ -147,7 +147,7 @@ class Distribution(object):
       return all(isValueLegal(i, value) for value in call.parameters)
 
     return all(isCallLegal(i, call) for i,call in enumerate(calls)) \
-        and all(isValueLegal(len(calls), r) for r in result)
+       and all(isValueLegal(len(calls), r) for r in result)
 
   def __str__(self):
     return '\n'.join(list(map(str, self.calls)) + [' '.join(map(str, self.result))])

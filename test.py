@@ -2,7 +2,7 @@ import algprob
 from defmodel import export, PythonDistributionSystem
 from distribution import CallRef, DistrCall, Distribution, LiteralRef
 from model import DistrResult, Model, WrappedModel
-from proof import LetProof, ProbLabel, Proof, ReturnProof, Variable
+from proof import ProbLabel, Proof, Variable
 from sample import sample
 from proofsystem import evaluateProof
 
@@ -10,7 +10,7 @@ class TestDistributionSystem(PythonDistributionSystem):
 
   @export
   def biasFromBool(self, arg):
-    return 0.15 if arg else 0.85
+    return 0.85 if arg else 0.15
 
   @export
   def decideBias(self):
@@ -43,22 +43,19 @@ def testProof():
   true = model.JSONToRef(True)
   false = model.JSONToRef(False)
   highBias = model.JSONToRef(0.85)
-  biasCall = DistrCall('decideBias', [])
+  bernouliCall = DistrCall('bernouli', [half])
+  bernouliLabel = ProbLabel(bernouliCall, [true])
+  decideBiasCall = DistrCall('decideBias', [])
   biasTrueCall = DistrCall('biasFromBool', [true])
-  biasLabel = ProbLabel(biasCall, [highBias])
+  decideBiasLabel = ProbLabel(decideBiasCall, [highBias])
   biasTrueLabel = ProbLabel(biasTrueCall, [highBias])
-  biasTrueProof = LetProof(
-    ReturnProof([highBias])
+  biasTrueProof = Proof(biasTrueLabel, [[]])
+  decideBiasProof = Proof(
+    decideBiasLabel, [
+      [bernouliLabel, biasTrueLabel]
+    ]
   )
-
-  biasProof = LetProof(
-    DistrCall('bernouli', [half]), {
-      (true,): LetProof(
-        biasCall, {
-          (highBias,): ReturnProof([highBias])
-        }
-      )
-    }
-  )
+  res = evaluateProof(model, [decideBiasProof, biasTrueProof], 0)
+  print(res)
 
 testProof()
