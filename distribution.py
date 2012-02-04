@@ -106,6 +106,9 @@ class DistrCall(object):
     return {'function': self.function,
             'parameters': [p.toJSON() for p in self.parameters]}
 
+  def isPrimitive(self):
+    return self.function == 'bernouli'
+
   @staticmethod
   def fromJSON(jsonObj):
     return DistrCall(

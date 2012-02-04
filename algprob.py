@@ -9,7 +9,6 @@ from distribution import CallRef, DistrCall, Distribution, LiteralRef
 from model import DistrResult, Model
 
 
-
 def resolveValue(values, val):
   if isinstance(val, CallRef):
     return values[val.callIndex][val.valueIndex]

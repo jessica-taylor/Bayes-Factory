@@ -110,59 +110,46 @@ class ProofEnv(object):
     for proof in proofSystem:
       self.expandProof(proof)
 
-  def createNumericPolys(self):
-    self.labels = list(self.labelPolys)
-    self.invLabels = {}
-    for i,label in enumerate(self.labels):
-      self.invLabels[label] = i
-    self.numLabelPolys = {}
-    for i,label in enumerate(self.labels):
-      numTerms = []
-      for factors in self.labelPolys[label]:
-        logCoeff = 0
-        numFactors = []
-        for factor in factors:
-          if factor.call.function == 'bernouli':
-            (probVal,) = factor.call.parameters
-            probRef = self.resolveValue(probVal)
-            prob = self.model.refToJSON(probRef)
-            assert 0 <= prob <= 1
-            (resVal,) = factor.result
-            resRef = self.resolveValue(resVal)
-            res = self.model.refToJSON(resRef)
-            assert res in [True, False]
-            if res:
-              probCorrect = prob
-            else:
-              probCorrect = 1 - prob
-            logCoeff += math.log(probCorrect)
-          else:
-            assert factor in self.invLabels
-            numFactors.append(self.invLabels[factor])
-        numTerms.append((logCoeff, numFactors))
-      self.numLabelPolys[i] = numTerms
-
 
   def sortCalls(self):
     graph = {}
-    for i,terms in self.numLabelPolys.items():
+    for label,terms in self.labelPolys.items():
       refs = set([])
-      for _,factors in terms:
+      for factors in terms:
         for factor in factors:
-          refs.add(factor)
-      graph[i] = list(refs)
+          if not factor.call.isPrimitive():
+            refs.add(factor)
+      graph[label] = list(refs)
     components = graphsort.robust_topological_sort(graph)
     components.reverse()
     return components
 
-  def updateProb(self, i):
+  def cachedProbability(self, label):
+    if label.call.function == 'bernouli':
+      (probVal,) = label.call.parameters
+      probRef = self.resolveValue(probVal)
+      prob = self.model.refToJSON(probRef)
+      assert 0 <= prob <= 1
+      (resVal,) = label.result
+      resRef = self.resolveValue(resVal)
+      res = self.model.refToJSON(resRef)
+      assert res in [True, False]
+      if res:
+        return prob
+      else:
+        return 1 - prob
+    else:
+      return self.logProbs[label]
+
+
+  def updateProb(self, label):
     def termProb(term):
-      return term[0] + sum(self.logProbs[j] for j in term[1])
-    oldLogProb = self.logProbs[i]
-    self.logProbs[i] = util.sumByLogs(list(map(termProb, self.numLabelPolys[i])))
-    if self.logProbs[i] == util.negInfinity:
+      return sum(map(self.cachedProbability, term))
+    oldLogProb = self.logProbs[label]
+    self.logProbs[label] = util.sumByLogs(list(map(termProb, self.labelPolys[label])))
+    if self.logProbs[label] == util.negInfinity:
       return 0.0
-    return self.logProbs[i] - oldLogProb
+    return self.logProbs[label] - oldLogProb
 
 
   def solveSCC(self, component):
@@ -180,14 +167,10 @@ class ProofEnv(object):
 
   def solveProofSystem(self, proofSystem):
     self.expandProofSystem(proofSystem)
-    self.createNumericPolys()
     self.solveSystem()
 
   def getFinalResult(self):
-    res = {}
-    for i,logProb in self.logProbs.items():
-      res[self.labels[i]] = logProb
-    return res
+    return dict(self.logProbs)
 
 
 def evaluateProof(model, proofSystem, timePenaltyRate):
