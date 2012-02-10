@@ -17,8 +17,12 @@ def makeDataClass(cls):
   def clsHash(self):
     return hash(cls) ^ hash(self.getData())
 
+  def clsRepr(self):
+    return cls.__name__ + "(" + ", ".join(map(repr, self.getData())) + ")"
+
   cls.__cmp = clsCmp
   cls.__hash__ = clsHash
+  cls.__repr__ = clsRepr
 
 negInfinity = float("-inf")
 

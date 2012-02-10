@@ -4,7 +4,7 @@ from distribution import CallRef, DistrCall, Distribution, LiteralRef
 from model import DistrResult, Model, WrappedModel
 from proof import ProbLabel, Proof, Variable
 from sample import sample
-from proofsystem import evaluateProof
+from proofenv import evaluateProof
 
 class TestDistributionSystem(PythonDistributionSystem):
 
@@ -27,6 +27,7 @@ class TestDistributionSystem(PythonDistributionSystem):
   @export
   def main(self):
     return self.flipWithBias(20, self.decideBias())
+
 
 def testSample():
   model = WrappedModel(TestDistributionSystem().getModel())

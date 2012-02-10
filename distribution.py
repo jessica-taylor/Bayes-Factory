@@ -40,11 +40,11 @@ class LiteralRef(DistrValue):
     assert isinstance(ref, int)
     self.ref = ref
 
-  def __str__(self):
+  def prettyString(self):
     return '@%s' % self.ref
 
   def getData(self):
-    return self.ref
+    return (self.ref,)
 
   def toJSON(self):
     return {'type': 'literal', 'ref': self.ref}
@@ -71,7 +71,7 @@ class CallRef(DistrValue):
     self.callIndex = callIndex
     self.valueIndex = valueIndex
 
-  def __str__(self):
+  def prettyString(self):
     return '$(' + str(self.callIndex) + ', ' + str(self.valueIndex) + ')'
 
   def getData(self):
@@ -96,7 +96,7 @@ class DistrCall(object):
     self.function = function
     self.parameters = parameters
 
-  def __str__(self):
+  def prettyString(self):
     return ' '.join(map(str, [self.function] + list(self.parameters)))
 
   def getData(self):
@@ -152,7 +152,7 @@ class Distribution(object):
     return all(isCallLegal(i, call) for i,call in enumerate(calls)) \
        and all(isValueLegal(len(calls), r) for r in result)
 
-  def __str__(self):
+  def prettyString(self):
     return '\n'.join(list(map(str, self.calls)) + [' '.join(map(str, self.result))])
 
   def getData(self):

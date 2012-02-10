@@ -13,7 +13,7 @@ class Variable(DistrValue):
     self.varid = varid
 
   def getData(self):
-    return self.varid
+    return (self.varid,)
 
   def toJSON(self):
     return {'type': 'variable', 'varid': self.varid}
@@ -41,7 +41,7 @@ class ProbLabel(object):
   def getData(self):
     return (self.call, self.result)
 
-  def __str__(self):
+  def prettyString(self):
     return str(self.call) + " -> " + ' '.join(map(str, self.result))
 
   def toJSON(self):
@@ -67,7 +67,7 @@ class Proof(object):
   def getData(self):
     return (self.label, self.callLabelsList)
 
-  def __str__(self):
+  def prettyString(self):
     def callLabelsStr(callLabels):
       return '{' + '; '.join(map(str, callLabels)) + '}'
     return str(self.label) + " : " + ', '.join(map(callLabelsStr, self.callLabelsList))
