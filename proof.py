@@ -1,9 +1,10 @@
 # Data classes related to proof systems for models.
 
-from distribution import DistrCall, DistrValue, LiteralRef
+import algprob
+from distribution import DistrCall, DistrValue, Distribution, LiteralRef
 from util import makeDataClass
 
-class Variable(DistrValue):
+class ProofVar(DistrValue):
   """
   A placeholder for use in a DistrCall or Distribution.  Multiple uses of the
   same variable should be equal.
@@ -16,14 +17,14 @@ class Variable(DistrValue):
     return (self.varid,)
 
   def toJSON(self):
-    return {'type': 'variable', 'varid': self.varid}
+    return {'type': 'proofvar', 'varid': self.varid}
 
-makeDataClass(Variable)
+makeDataClass(ProofVar)
 
 def isProofValue(value):
-  return isinstance(value, LiteralRef) or isinstance(value, Variable)
+  return isinstance(value, LiteralRef) or isinstance(value, ProofVar)
 
-class ProbLabel(object):
+class ProbLabel:
   """
   Collection of a DistrCall and its results (as LiteralRefs).  This can be
   assigned a probability, the probability that the call produces objects
@@ -50,42 +51,61 @@ class ProbLabel(object):
 
 makeDataClass(ProbLabel)
 
+class VariableMapping:
+  """
+  Mapping of variable name to value (LiteralRef or ProofVar).
+  """
 
-class Proof(object):
+  def __init__(self, values):
+    if isinstance(values, dict):
+      values = values.items()
+    self.values = {}
+    for k,v in values:
+      assert isinstance(k, str)
+      assert isinstance(v, LiteralRef) or isinstance(v, ProofVar)
+      self.values[k] = v
 
-  def __init__(self, label, callLabelsList):
+  def getData(self):
+    return (sorted(tuple(self.values.items())),)
+
+  def getCallLabels(self, distr):
+    assert isinstance(distr, Distribution)
+    values = {}
+    labels = []
+    for assn in distr.assignments:
+      call = algprob.resolveCall(values, assn.call)
+      result = [self.values[v] for v in assn.variables]
+      algprob.addValues(values, assn.variables, result)
+      labels.append(ProbLabel(call, result))
+    return labels
+
+
+makeDataClass(VariableMapping)
+
+class Proof:
+
+  def __init__(self, label, mappings):
     assert isinstance(label, ProbLabel)
-    callLabelsList = tuple(map(tuple, callLabelsList))
-    assert all(all(isinstance(x, ProbLabel) for x in xs)
-               for xs in callLabelsList)
-    if len(callLabelsList) > 0:
-      length = len(callLabelsList[0])
-      assert all(len(x) == length for x in callLabelsList)
+    mappings = tuple(mappings)
+    assert all(isinstance(x, VariableMapping) for x in mappings)
+    if len(mappings) > 0:
+      keys = mappings[0].values.keys()
+      assert all(x.values.keys() == keys for x in mappings)
     self.label = label
-    self.callLabelsList = callLabelsList
+    self.mappings = mappings
 
   def getData(self):
-    return (self.label, self.callLabelsList)
+    return (self.label, self.mappings)
 
-  def prettyString(self):
-    def callLabelsStr(callLabels):
-      return '{' + '; '.join(map(str, callLabels)) + '}'
-    return str(self.label) + " : " + ', '.join(map(callLabelsStr, self.callLabelsList))
+  def getCallLabelsList(self, distr):
+    assert isinstance(distr, Distribution)
+    return [m.getCallLabels(distr) for m in self.mappings]
 
-makeDataClass(Proof)
+  # def prettyString(self):
+  #   def callLabelsStr(callLabels):
+  #     return '{' + '; '.join(map(str, callLabels)) + '}'
+  #   return str(self.label) + " : " + ', '.join(map(callLabelsStr, self.callLabelsList))
 
-
-"""
-class Proof(object):
-  A proof proves a lower bound on the probability of a ProbLabel in terms of other
-  ProbLabels.
-  def __init__(self, labels):
-    self.labels = tuple(labels)
-    assert all(isinstance(x, ProbLabel) for x in self.labels)
-
-  def getData(self):
-    return self.labels
 
 makeDataClass(Proof)
-"""
 

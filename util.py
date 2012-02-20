@@ -16,15 +16,44 @@ def makeDataClass(cls):
 
   def clsHash(self):
     return hash(cls) ^ hash(self.getData())
+  cls.__hash__ = clsHash
 
   def clsRepr(self):
     return cls.__name__ + "(" + ", ".join(map(repr, self.getData())) + ")"
-
-  cls.__cmp = clsCmp
-  cls.__hash__ = clsHash
   cls.__repr__ = clsRepr
 
+  def clsLt(self, other):
+    return self.getData() < other.getData()
+  cls.__lt__ = clsLt
+
+  def clsLe(self, other):
+    return self.getData() <= other.getData()
+  cls.__le__ = clsLe
+
+  def clsEq(self, other):
+    return self.getData() == other.getData()
+  cls.__eq__ = clsEq
+
+  def clsNe(self, other):
+    return self.getData() != other.getData()
+  cls.__ne__ = clsNe
+
+  def clsGe(self, other):
+    return self.getData() >= other.getData()
+  cls.__ge__ = clsGe
+
+  def clsGt(self, other):
+    return self.getData() > other.getData()
+  cls.__gt__ = clsGt
+
 negInfinity = float("-inf")
+
+def prettyString(value):
+  if hasattr(value, 'prettyString'):
+    return value.prettyString()
+  if isinstance(value, list):
+    return '[' + ', '.join(map(prettyString, value)) + ']'
+  return str(value)
 
 def sumByLogs(xs):
   """

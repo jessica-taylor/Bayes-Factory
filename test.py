@@ -2,32 +2,39 @@ import algprob
 from defmodel import export, PythonDistributionSystem
 from distribution import CallRef, DistrCall, Distribution, LiteralRef
 from model import DistrResult, Model, WrappedModel
-from proof import ProbLabel, Proof, Variable
+from proof import ProbLabel, Proof, ProofVar, VariableMapping
 from sample import sample
 from proofenv import evaluateProof
 
 class TestDistributionSystem(PythonDistributionSystem):
 
   @export
-  def biasFromBool(self, arg):
+  def biasFromBool(self, v, arg):
     return 0.85 if arg else 0.15
 
   @export
-  def decideBias(self):
-    return self.biasFromBool(self.bernouli(0.5))
+  def decideBias(self, v):
+    v.chance = self.bernouli(0.5)
+    v.result = self.biasFromBool(v.chance)
+    return v.result
 
   @export
-  def makeList(self, *args):
+  def makeList(self, v, *args):
     return list(args)
 
   @export
-  def flipWithBias(self, nflips, bias):
-    return self.makeList(*[self.bernouli(bias) for i in range(nflips)])
+  def flipWithBias(self, v, nflips, bias):
+    for i in range(nflips):
+      v['flip' + str(i)] = self.bernouli(bias)
+    v.result = self.makeList(*[v['flip' + str(i)] for i in range(nflips)])
+    return v.result
+
 
   @export
   def main(self):
-    return self.flipWithBias(20, self.decideBias())
-
+    v.bias = self.decideBias()
+    v.result = self.flipWithBias(20, v.bias)
+    return v.result
 
 def testSample():
   model = WrappedModel(TestDistributionSystem().getModel())
@@ -44,18 +51,21 @@ def testProof():
   true = model.JSONToRef(True)
   false = model.JSONToRef(False)
   highBias = model.JSONToRef(0.85)
+
   bernouliCall = DistrCall('bernouli', [half])
   bernouliLabel = ProbLabel(bernouliCall, [true])
   decideBiasCall = DistrCall('decideBias', [])
   biasTrueCall = DistrCall('biasFromBool', [true])
   decideBiasLabel = ProbLabel(decideBiasCall, [highBias])
   biasTrueLabel = ProbLabel(biasTrueCall, [highBias])
-  biasTrueProof = Proof(biasTrueLabel, [[]])
-  decideBiasProof = Proof(
-    decideBiasLabel, [
-      [bernouliLabel, biasTrueLabel]
-    ]
-  )
+
+  biasTrueProof = Proof(biasTrueLabel, [
+    VariableMapping({})
+  ])
+
+  decideBiasProof = Proof(decideBiasLabel, [
+    VariableMapping({'chance': true, 'result': highBias})
+  ])
   res = evaluateProof(model, [decideBiasProof, biasTrueProof], 0)
   print(res)
 

@@ -12,11 +12,12 @@ import algprob
 def sampleDistr(model, distribution):
   assert isinstance(model, Model)
   assert isinstance(distribution, Distribution)
-  values = []
-  for call in distribution.calls:
-    resolvedCall = algprob.resolveCall(values, call)
-    values.append(sample(model, resolvedCall))
-  return tuple(resolveValue(values, r) for r in distribution.result)
+  values = {}
+  for assn in distribution.assignments:
+    resolvedCall = algprob.resolveCall(values, assn.call)
+    res = sample(model, resolvedCall)
+    algprob.addValues(values, assn.variables, res)
+  return tuple(algprob.resolveValue(values, r) for r in distribution.result)
 
 
 def sample(model, call):
